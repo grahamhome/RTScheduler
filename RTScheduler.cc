@@ -4,12 +4,16 @@
 #include <vector>
 #include <string>
 #include <pthread.h>
+#include <unistd.h>
 using namespace std;
 
 #define NUM_TASKS 10
-vector<Task*> tasks;
-
-Task* (*algorithm)();
+vector<Task*> allTasks;
+vector<Task*> activeTasks; // Ordered by priority, low to high
+pthread_mutex_t activeTasksMutex;
+int algorithm = -1;
+bool tasksRunning = false;
+pthread_mutex_t runMutex;
 
 /* Method run by a task during execution */
 void* execute(void* task) {
@@ -28,65 +32,111 @@ void createThread(pthread_t* thread, Task* task) {
 	pthread_create(thread, &attributes, execute, (void*)task);
 }
 
-Task* EDF(){
-	Task* earliestTask = NULL;
-	int i;
-	for (i=0;i<NUM_TASKS;i++){
-		Task* task = tasks.at(i);
+/* Assign priorities to all tasks based on EDF algorithm */
+void EDF(){
+	/* Lock the active tasks list mutex
+	 * so no task threads will try to select
+	 * the next task from the list while we are rebuilding it
+	 */
+	pthread_mutex_lock(&activeTasksMutex);
+	activeTasks.clear();
+	for (int i=0;i<NUM_TASKS;i++){
+		Task* task = allTasks.at(i);
 		if(!task->completed){
-			if (earliestTask == NULL || (earliestTask->deadline > task->deadline)) {
-				earliestTask = task;
+			int t;
+			for (t=0;t<activeTasks.size();t++) {
+				if (activeTasks.at(t)->deadline > task->deadline) {
+					break;
+				}
 			}
+			activeTasks.insert(activeTasks.begin()+t, task);
 		}
 	}
-	return earliestTask;
+	pthread_mutex_unlock(&activeTasksMutex);
 }
 
-Task* SCT(){
-	Task* earliestTask = NULL;
-	int i;
-	for (i=0;i<NUM_TASKS;i++){
-		Task* task = tasks.at(i);
+void* SCT(){
+	/* Lock the active tasks list mutex
+	 * so no task threads will try to select
+	 * the next task from the list while we are rebuilding it
+	 */
+	pthread_mutex_lock(&activeTasksMutex);
+	activeTasks.clear();
+	for (int i=0;i<NUM_TASKS;i++){
+		Task* task = allTasks.at(i);
 		if(!task->completed){
-			if (earliestTask == NULL || (earliestTask->rem_exec_time > task->rem_exec_time)) {
-				earliestTask = task;
+			int t;
+			for (t=0;t<activeTasks.size();t++) {
+				if (activeTasks.at(t)->rem_exec_time > task->rem_exec_time) {
+					break;
+				}
 			}
+			activeTasks.insert(activeTasks.begin()+t, task);
 		}
 	}
-	return earliestTask;
+	pthread_mutex_unlock(&activeTasksMutex);
 }
 
-Task* LST(){
-	Task* earliestTask = NULL;
-	int i;
-	for (i=0;i<NUM_TASKS;i++){
-		Task* task = tasks.at(i);
+void LST(){
+	/* Lock the active tasks list mutex
+	 * so no task threads will try to select
+	 * the next task from the list while we are rebuilding it
+	 */
+	pthread_mutex_lock(&activeTasksMutex);
+	activeTasks.clear();
+	for (int i=0;i<NUM_TASKS;i++){
+		Task* task = allTasks.at(i);
 		if(!task->completed){
-			if (earliestTask == NULL || (earliestTask->deadline - earliestTask->rem_exec_time > task->deadline - task->rem_exec_time)) {
-				earliestTask = task;
+			int t;
+			for (t=0;t<activeTasks.size();t++) {
+				if (activeTasks.at(t)->deadline-activeTasks.at(t)->rem_exec_time > task->deadline-task->rem_exec_time) {
+					break;
+				}
 			}
+			activeTasks.insert(activeTasks.begin()+t, task);
 		}
 	}
-	return earliestTask;
+	pthread_mutex_unlock(&activeTasksMutex);
+}
+
+void scheduleTasks() {
+	switch(algorithm) {
+	case 0:
+		EDF();
+		break;
+	case 1:
+		SCT();
+		break;
+	case 2:
+		LST();
+		break;
+	}
+}
+
+void startAllTasks() {
+	pthread_mutex_lock(&runMutex);
+	tasksRunning = true;
+	pthread_mutex_unlock(&runMutex);
 }
 
 int main(int argc, char *argv[]) {
+	pthread_mutex_init(&activeTasksMutex);
+	pthread_mutex_init(&runMutex);
 	printf("Welcome to the Real-Time Scheduler\n");
 	printf("Scheduling algorithm choices:\n(0) Earliest Deadline First\n(1) Shortest Completion Time\n(2) Least Slack Time\n");
 	printf("Choose a scheduling algorithm (enter the number of your choice): ");
-	int selection = -1;
-	while (!(selection>=0 && selection <=2)) {
-		cin >> selection;
+	while (!(algorithm>=0 && algorithm <=2)) {
+		cin >> algorithm;
 	}
 	printf("You selected ");
-	switch(selection) {
-	case 0: algorithm = &EDF;
+	switch(algorithm) {
+	case 0:
 			printf("Earliest Deadline First\n");
 			break;
-	case 1: algorithm = &SCT;
+	case 1:
 			printf("Shortest Completion Time\n");
 			break;
-	case 2: algorithm = &LST;
+	case 2:
 			printf("Least Slack Time\n");
 			break;
 	}
@@ -136,35 +186,23 @@ int main(int argc, char *argv[]) {
 			pthread_t* taskThread = NULL;
 			Task* task = new Task(name, c, p, d, taskThread);
 			createThread(taskThread, task);
-			tasks.push_back(task);
+			allTasks.push_back(task);
 		}
 	}
 
 	//Scheduler section
 	int runTime = 0;
 	int elapsedTime = 0;
-	Task* currentTask;
-	Task* previousTask = NULL;
-
 
 	printf("How long would you like to run the simulation for? ");
 	cin >> runTime;
-	currentTask = algorithm();
+	scheduleTasks();
+	startAllTasks();
 
 	while(elapsedTime < runTime){
-
-		if (currentTask != previousTask && previousTask != NULL){
-			currentTask.runSet(true);
-			previousTask.runSet(false);
-		}else{
-
-		}
-		//
-		currentTask->total_exec_time ++;
-		currentTask = algorithm();
+		sleep(1);
+		scheduleTasks();
 	}
-	printf("%d", tasks.size());
-
 
 	return EXIT_SUCCESS;
 }

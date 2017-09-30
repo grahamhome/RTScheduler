@@ -32,6 +32,7 @@ Task(string t_name, int t_exec_time, int t_deadline, int t_period, pthread_t* t_
 	completed = false;
 	canRun = false;
 	priority =  1;
+	pthread_mutex_init(&runLock, NULL);
 }
 
 /* Set the task's priority */
