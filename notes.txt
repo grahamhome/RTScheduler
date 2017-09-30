@@ -1,0 +1,19 @@
+Scheduler:
+starts a timer counting up
+calculate priorities
+start highest priority task
+loop:
+whenever timer reaches a certain point (example: every 1 second):
+re-calculate priorities
+stop current task
+start highest priority.
+
+When timer reaches maximum time (set by user): stop all tasks & report stats.
+
+
+
+Tasks:
+While not running: do nothing
+while running: 
+1. check if missed deadline, if so, report missed deadline, start next priority task. 
+2. check if elapsed time = execution time, if so, mark "completed" and start next priority task.

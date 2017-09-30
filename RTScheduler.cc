@@ -206,9 +206,13 @@ int main(int argc, char *argv[]) {
 	printf("How long would you like to run the simulation for? ");
 	cin >> runTime;
 	scheduleTasks();
-	startAllTasks();
+	// start highest task
+	//startAllTasks();
 
 	while(elapsedTime < runTime){
+		// Start timer
+		// when timer hits a certain point: reschedule, stop current task, start highest task
+		// Finally: stop all tasks & report status
 		sleep(1);
 		scheduleTasks();
 	}
