@@ -53,7 +53,23 @@ Task* LST(){
 
 int main(int argc, char *argv[]) {
 	printf("Welcome to the Real-Time Scheduler\n");
-	printf("Scheduling algorithm choices:\n(0) Earliest Deadline First\n(1) Shortest Completion Time\n(2) Least Slack Time\n")
+	printf("Scheduling algorithm choices:\n(0) Earliest Deadline First\n(1) Shortest Completion Time\n(2) Least Slack Time\n");
 	printf("Choose a scheduling algorithm (enter the number of your choice): ");
+	int selection = -1;
+	while (!(selection>=0 && selection <3)) {
+		cin >> selection;
+	}
+	printf("You selected ");
+	switch(selection) {
+	case 0: algorithm = &EDF;
+			printf("Earliest Deadline First\n");
+			break;
+	case 1: algorithm = &SCT;
+			printf("Shortest Completion Time\n");
+			break;
+	case 2: algorithm = &LST;
+			printf("Least Slack Time\n");
+			break;
+	}
 	return EXIT_SUCCESS;
 }
