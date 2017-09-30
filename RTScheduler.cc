@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
 			printf("Least Slack Time\n");
 			break;
 	}
-	printf("Enter tasks in the format \'<name> <execution time> <deadline> <period>\' and follow each with a newline.\nTo quit, enter \'start\' followed by a newline.\n");
+	printf("Enter tasks in the format \'<name> <execution time> <deadline> <period>\' and follow each with a newline.\nTo run tasks, enter \'start\' followed by a newline.\n");
 	string input;
 	getline(cin, input); // Ignore newline from previous println
 	bool done = false;
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
 		int d;
 		int tokenCount = 0;
 		size_t pos = 0;
-		while (((pos = input.find(" ")) != string::npos) && tokenCount < 4) {
+		while (((pos = input.find(" ")) <= string::npos) && tokenCount < 4) {
 			switch(tokenCount) {
 			case 0:
 				name = input.substr(0, pos);
@@ -128,6 +128,7 @@ int main(int argc, char *argv[]) {
 				tokenCount++;
 				break;
 			}
+			input.erase(0, pos+1);
 		}
 		if (tokenCount != 4) {
 			printf("Invalid task format.\n");
@@ -163,6 +164,7 @@ int main(int argc, char *argv[]) {
 		currentTask = algorithm();
 	}
 	printf("%d", tasks.size());
+
 
 	return EXIT_SUCCESS;
 }
