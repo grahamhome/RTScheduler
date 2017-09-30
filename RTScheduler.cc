@@ -119,9 +119,18 @@ void startAllTasks() {
 	pthread_mutex_unlock(&runMutex);
 }
 
+bool checkTasksRunning() {
+	bool running = false;
+	pthread_mutex_lock(&runMutex);
+	running = tasksRunning;
+	pthread_mutex_unlock(&runMutex);
+	return running;
+
+}
+
 int main(int argc, char *argv[]) {
-	pthread_mutex_init(&activeTasksMutex);
-	pthread_mutex_init(&runMutex);
+	pthread_mutex_init(&activeTasksMutex, NULL);
+	pthread_mutex_init(&runMutex, NULL);
 	printf("Welcome to the Real-Time Scheduler\n");
 	printf("Scheduling algorithm choices:\n(0) Earliest Deadline First\n(1) Shortest Completion Time\n(2) Least Slack Time\n");
 	printf("Choose a scheduling algorithm (enter the number of your choice): ");
