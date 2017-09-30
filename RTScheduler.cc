@@ -3,6 +3,7 @@
 #include <Task.cc>
 #include <vector>
 #include <string>
+#include <pthread.h>
 using namespace std;
 
 #define NUM_TASKS 10
@@ -138,6 +139,32 @@ int main(int argc, char *argv[]) {
 			tasks.push_back(task);
 		}
 	}
+
+	//Scheduler section
+	int runTime = 0;
+	int elapsedTime = 0;
+	Task* currentTask;
+	Task* previousTask = NULL;
+
+
+	printf("How long would you like to run the simulation for? ");
+	cin >> runTime;
+	currentTask = algorithm();
+
+	while(elapsedTime < runTime){
+
+		if (currentTask != previousTask && previousTask != NULL){
+			currentTask.runSet(true);
+			previousTask.runSet(false);
+		}else{
+
+		}
+		//
+		currentTask->total_exec_time ++;
+		currentTask = algorithm();
+	}
+	printf("%d", tasks.size());
+
 
 	return EXIT_SUCCESS;
 }

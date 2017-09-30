@@ -13,8 +13,11 @@ public:
 		int rem_exec_time;
 		int deadline;
 		int period;
+		int priority;
 		pthread_t* thread;
 		bool completed; // completed during this period
+		bool canRun;
+		pthread_mutex_t runLock;
 
 public:
 
@@ -27,6 +30,8 @@ Task(string t_name, int t_exec_time, int t_deadline, int t_period, pthread_t* t_
 	period = t_period;
 	thread = t_thread;
 	completed = false;
+	canRun = false;
+	priority =  1;
 }
 
 /* Set the task's priority */
@@ -36,6 +41,12 @@ void setPriority(int new_priority) {
 	struct sched_param* param;
 	pthread_getschedparam(*thread, NULL, param);
 	printf("%s is at priority %d", name.c_str(), param->sched_priority);
+}
+
+void setRun(bool status){
+	pthread_mutex_lock(&runLock);
+	canRun = status;
+	pthread_mutex_lock(&runLock);
 }
 };
 
