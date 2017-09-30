@@ -49,6 +49,14 @@ void setRun(bool status){
 	canRun = status;
 	pthread_mutex_lock(&runLock);
 }
+
+bool canRun() {
+	bool status;
+	pthread_mutex_lock(&runLock);
+	status = canRun;
+	pthread_mutex_lock(&runLock);
+	return status;
+}
 };
 
 
