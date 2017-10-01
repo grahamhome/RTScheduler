@@ -46,6 +46,9 @@ void scheduleTasks();
 /* Return elapsed time since start of scheduler loop in seconds */
 double elapsedTime();
 
+/* Start or stop all tasks */
+void toggleAll(bool run);
+
 /* Scheduler loop  */
 int main(int argc, char *argv[]);
 

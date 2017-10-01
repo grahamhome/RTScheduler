@@ -110,10 +110,21 @@ double elapsedTime() {
 	return difftime(time(NULL), startTime);
 }
 
+/* Start or stop all tasks */
+void toggleAll(bool run) {
+	for (int i=0;i<tasks.size();i++) {
+		Task* t = tasks.at(i);
+		pthread_mutex_lock(&(t->activeMutex));
+		t->active = run;
+		pthread_mutex_unlock(&(t->activeMutex));
+
+	}
+}
+
 /* Scheduler loop  */
 int main(int argc, char *argv[]) {
 	// Ensure no tasks will run yet
-	Task::toggleAll(false);
+	toggleAll(false);
 	// Set up mutexes
 	pthread_mutex_init(&taskListMutex, NULL);
 
@@ -185,6 +196,7 @@ int main(int argc, char *argv[]) {
 			Task* task = new Task(name, c, p, d, taskThread);
 			createThread(taskThread, task);
 			tasks.push_back(task);
+			tokenCount = 0;
 		}
 	}
 
@@ -199,7 +211,7 @@ int main(int argc, char *argv[]) {
 	time(&startTime);
 
 	// Start all tasks
-	Task::toggleAll(true);
+	toggleAll(true);
 
 	while(elapsedTime() < runTime){
 		// Scheduler runs periodically
