@@ -8,9 +8,8 @@
 using namespace std;
 
 #define NUM_TASKS 10
-vector<Task*> allTasks;
-vector<Task*> activeTasks; // Ordered by priority, low to high
-pthread_mutex_t activeTasksMutex;
+vector<Task*> tasks; // Ordered by priority, high to low
+pthread_mutex_t taskListMutex;
 int algorithm = -1;
 bool tasksRunning = false;
 pthread_mutex_t runMutex;
@@ -34,69 +33,70 @@ void createThread(pthread_t* thread, Task* task) {
 
 /* Assign priorities to all tasks based on EDF algorithm */
 void EDF(){
+	vector<Task*> orderedTasks;
+	for (int i=0;i<NUM_TASKS;i++){
+		Task* task = tasks.at(i);
+		if(!task->completed){
+			int t;
+			for (t=0;t<orderedTasks.size();t++) {
+				if (orderedTasks.at(t)->deadline > task->deadline) {
+					break;
+				}
+			}
+			orderedTasks.insert(orderedTasks.begin()+t, task);
+		}
+	}
 	/* Lock the active tasks list mutex
 	 * so no task threads will try to select
 	 * the next task from the list while we are rebuilding it
 	 */
-	pthread_mutex_lock(&activeTasksMutex);
-	activeTasks.clear();
-	for (int i=0;i<NUM_TASKS;i++){
-		Task* task = allTasks.at(i);
-		if(!task->completed){
-			int t;
-			for (t=0;t<activeTasks.size();t++) {
-				if (activeTasks.at(t)->deadline > task->deadline) {
-					break;
-				}
-			}
-			activeTasks.insert(activeTasks.begin()+t, task);
-		}
-	}
-	pthread_mutex_unlock(&activeTasksMutex);
+	pthread_mutex_lock(&taskListMutex);
+	tasks = orderedTasks;
+	pthread_mutex_unlock(&taskListMutex);
 }
 
 void* SCT(){
+	vector<Task*> orderedTasks;
+	for (int i=0;i<NUM_TASKS;i++){
+		Task* task = tasks.at(i);
+		if(!task->completed){
+			int t;
+			for (t=0;t<orderedTasks.size();t++) {
+				if (orderedTasks.at(t)->rem_exec_time > task->rem_exec_time) {
+					break;
+				}
+			}
+			orderedTasks.insert(orderedTasks.begin()+t, task);
+		}
+	}
 	/* Lock the active tasks list mutex
 	 * so no task threads will try to select
 	 * the next task from the list while we are rebuilding it
 	 */
-	pthread_mutex_lock(&activeTasksMutex);
-	activeTasks.clear();
-	for (int i=0;i<NUM_TASKS;i++){
-		Task* task = allTasks.at(i);
-		if(!task->completed){
-			int t;
-			for (t=0;t<activeTasks.size();t++) {
-				if (activeTasks.at(t)->rem_exec_time > task->rem_exec_time) {
-					break;
-				}
-			}
-			activeTasks.insert(activeTasks.begin()+t, task);
-		}
-	}
-	pthread_mutex_unlock(&activeTasksMutex);
+	pthread_mutex_lock(&taskListMutex);
+	tasks = orderedTasks;
+	pthread_mutex_unlock(&taskListMutex);
 }
 
 void LST(){
+	vector<Task*> orderedTasks;
+	for (int i=0;i<NUM_TASKS;i++){
+		Task* task = tasks.at(i);
+		int t;
+		for (t=0;t<orderedTasks.size();t++) {
+			if (orderedTasks.at(t)->deadline-orderedTasks.at(t)->rem_exec_time > task->deadline-task->rem_exec_time) {
+				break;
+			}
+		}
+		orderedTasks.insert(orderedTasks.begin()+t, task);
+	}
 	/* Lock the active tasks list mutex
 	 * so no task threads will try to select
 	 * the next task from the list while we are rebuilding it
 	 */
-	pthread_mutex_lock(&activeTasksMutex);
-	activeTasks.clear();
-	for (int i=0;i<NUM_TASKS;i++){
-		Task* task = allTasks.at(i);
-		if(!task->completed){
-			int t;
-			for (t=0;t<activeTasks.size();t++) {
-				if (activeTasks.at(t)->deadline-activeTasks.at(t)->rem_exec_time > task->deadline-task->rem_exec_time) {
-					break;
-				}
-			}
-			activeTasks.insert(activeTasks.begin()+t, task);
-		}
-	}
-	pthread_mutex_unlock(&activeTasksMutex);
+	pthread_mutex_lock(&taskListMutex);
+	tasks = orderedTasks;
+	pthread_mutex_unlock(&taskListMutex);
 }
 
 void scheduleTasks() {
@@ -129,7 +129,7 @@ bool checkTasksRunning() {
 }
 
 int main(int argc, char *argv[]) {
-	pthread_mutex_init(&activeTasksMutex, NULL);
+	pthread_mutex_init(&taskListMutex, NULL);
 	pthread_mutex_init(&runMutex, NULL);
 	printf("Welcome to the Real-Time Scheduler\n");
 	printf("Scheduling algorithm choices:\n(0) Earliest Deadline First\n(1) Shortest Completion Time\n(2) Least Slack Time\n");
@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
 			pthread_t* taskThread = NULL;
 			Task* task = new Task(name, c, p, d, taskThread);
 			createThread(taskThread, task);
-			allTasks.push_back(task);
+			tasks.push_back(task);
 		}
 	}
 

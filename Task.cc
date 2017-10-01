@@ -16,7 +16,7 @@ public:
 		int priority;
 		pthread_t* thread;
 		bool completed; // completed during this period
-		bool canRun;
+		bool running;
 		pthread_mutex_t runLock;
 
 public:
@@ -30,7 +30,7 @@ Task(string t_name, int t_exec_time, int t_deadline, int t_period, pthread_t* t_
 	period = t_period;
 	thread = t_thread;
 	completed = false;
-	canRun = false;
+	running = false;
 	priority =  1;
 	pthread_mutex_init(&runLock, NULL);
 }
@@ -46,14 +46,14 @@ void setPriority(int new_priority) {
 
 void setRun(bool status){
 	pthread_mutex_lock(&runLock);
-	canRun = status;
+	running = status;
 	pthread_mutex_lock(&runLock);
 }
 
 bool canRun() {
 	bool status;
 	pthread_mutex_lock(&runLock);
-	status = canRun;
+	status = running;
 	pthread_mutex_lock(&runLock);
 	return status;
 }
