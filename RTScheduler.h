@@ -21,6 +21,8 @@
 vector<Task*> tasks; // Ordered by priority, high to low
 pthread_mutex_t taskListMutex;
 
+vector<Task*> missedTasks;
+
 int algorithm = -1; // Number used to select the scheduling algorithm
 
 time_t startTime;
@@ -45,6 +47,8 @@ void scheduleTasks();
 
 /* Return elapsed time since start of scheduler loop in seconds */
 double elapsedTime();
+
+int timeInPeriod(int period);
 
 /* Start or stop all tasks */
 void toggleAll(bool run);

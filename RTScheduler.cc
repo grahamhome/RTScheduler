@@ -1,12 +1,7 @@
 /* Scheduler program created by Graham Home and Alberto Castro */
 #include <RTScheduler.h>
-#include <math.h>
+#include <algorithm>
 using namespace std;
-
-/* Method run by a task during execution */
-void* execute(void* task) {
-	return NULL;
-}
 
 /* Set up a new thread */
 void createThread(pthread_t* thread, Task* task) {
@@ -25,15 +20,13 @@ void EDF(){
 	vector<Task*> orderedTasks;
 	for (int i=0;i<NUM_TASKS;i++){
 		Task* task = tasks.at(i);
-		if(!task->completed){
-			int t;
-			for (t=0;t<orderedTasks.size();t++) {
-				if (orderedTasks.at(t)->deadline > task->deadline) {
-					break;
-				}
+		int t;
+		for (t=0;t<orderedTasks.size();t++) {
+			if (orderedTasks.at(t)->deadline > task->deadline) {
+				break;
 			}
-			orderedTasks.insert(orderedTasks.begin()+t, task);
 		}
+		orderedTasks.insert(orderedTasks.begin()+t, task);
 	}
 	/* Lock the active tasks list mutex
 	 * so no task threads will try to select
@@ -49,15 +42,13 @@ void* SCT(){
 	vector<Task*> orderedTasks;
 	for (int i=0;i<NUM_TASKS;i++){
 		Task* task = tasks.at(i);
-		if(!task->completed){
-			int t;
-			for (t=0;t<orderedTasks.size();t++) {
-				if (orderedTasks.at(t)->rem_exec_time > task->rem_exec_time) {
-					break;
-				}
+		int t;
+		for (t=0;t<orderedTasks.size();t++) {
+			if (orderedTasks.at(t)->rem_exec_time > task->rem_exec_time) {
+				break;
 			}
-			orderedTasks.insert(orderedTasks.begin()+t, task);
 		}
+		orderedTasks.insert(orderedTasks.begin()+t, task);
 	}
 	/* Lock the active tasks list mutex
 	 * so no task threads will try to select
@@ -110,6 +101,14 @@ double elapsedTime() {
 	return difftime(time(NULL), startTime);
 }
 
+int periodCounter(int periodDuration) {
+	return elapsedTime()/periodDuration;
+}
+
+int timeInPeriod(int periodDuration) {
+	return elapsedTime() - (periodDuration*periodCounter(periodDuration));
+}
+
 /* Start or stop all tasks */
 void toggleAll(bool run) {
 	for (int i=0;i<tasks.size();i++) {
@@ -121,10 +120,37 @@ void toggleAll(bool run) {
 	}
 }
 
+/* Method run by a task during execution */
+void* execute(void* t) {
+	Task* task = (Task*)t;
+	int periodCount = 0;
+	while(!(task->canRun()));
+	while(task->canRun()) {
+		while (!(task->completed)) {
+			// Did we miss the deadline?
+			if (timeInPeriod(task->period) > task->deadline) {
+				if (find(missedTasks.begin(), missedTasks.end(), task) == missedTasks.end()) { // If the task is not already in the list of missed-deadline tasks, add it.
+					missedTasks.push_back(task);
+				}
+			}
+			// Count down
+			double elapsed = elapsedTime();
+			while(elapsed == elapsedTime());
+			task->rem_exec_time -= 1;
+			if (task->rem_exec_time == 0) {
+				task->completed = true;
+			}
+		}
+		while (task->completed) {
+			if (periodCounter(task->period) > periodCount) {
+				task->completed == false;
+			}
+		}
+	}
+}
+
 /* Scheduler loop  */
 int main(int argc, char *argv[]) {
-	// Ensure no tasks will run yet
-	toggleAll(false);
 	// Set up mutexes
 	pthread_mutex_init(&taskListMutex, NULL);
 
@@ -206,6 +232,7 @@ int main(int argc, char *argv[]) {
 	int runTime = 0;
 	printf("How many seconds would you like to run the simulation for? ");
 	cin >> runTime;
+	printf("Running tasks...\n");
 	scheduleTasks();
 	// Get start time
 	time(&startTime);
@@ -215,12 +242,17 @@ int main(int argc, char *argv[]) {
 
 	while(elapsedTime() < runTime){
 		// Scheduler runs periodically
-		if ( fmod(elapsedTime(), (double)SCHEDULER_FREQUENCY) == 0) {
+		if ( timeInPeriod(SCHEDULER_FREQUENCY) == 0) {
 			scheduleTasks();
 		}
 	}
-
-	// TODO: print stats
+	if (missedTasks.size() > 0) {
+		for (int i=0;i<missedTasks.size();i++) {
+			printf("Task %s missed its deadline.\n", (missedTasks.at(i)->name).c_str());
+		}
+	} else {
+		printf("All tasks ran for %d seconds without missing any deadlines.\n", runTime);
+	}
 
 	return EXIT_SUCCESS;
 }

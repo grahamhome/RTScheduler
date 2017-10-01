@@ -1,6 +1,5 @@
 #include <string>
 #include <pthread.h>
-#include <RTScheduler.h>
 using namespace std;
 
 class Task {
@@ -23,6 +22,7 @@ public:
 		period = t_period;
 		thread = t_thread;
 		completed = false;
+		active = false;
 		pthread_mutex_init(&activeMutex, NULL);
 	}
 
