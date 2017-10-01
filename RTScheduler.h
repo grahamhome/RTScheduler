@@ -39,7 +39,7 @@ void createThread(pthread_t* thread, Task* task);
 void EDF();
 
 /* Assign priorities to all tasks based on SCT algorithm */
-void* SCT();
+void SCT();
 
 /* Assign priorities to all tasks based on LST algorithm */
 void LST();

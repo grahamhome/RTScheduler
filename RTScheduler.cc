@@ -38,7 +38,7 @@ void EDF(){
 }
 
 /* Assign priorities to all tasks based on SCT algorithm */
-void* SCT(){
+void SCT(){
 	vector<Task*> orderedTasks;
 	for (int i=0;i<NUM_TASKS;i++){
 		Task* task = tasks.at(i);
@@ -109,17 +109,6 @@ int timeInPeriod(int periodDuration) {
 	return elapsedTime() - (periodDuration*periodCounter(periodDuration));
 }
 
-/* Start or stop all tasks */
-void toggleAll(bool run) {
-	for (int i=0;i<tasks.size();i++) {
-		Task* t = tasks.at(i);
-		pthread_mutex_lock(&(t->activeMutex));
-		t->active = run;
-		pthread_mutex_unlock(&(t->activeMutex));
-
-	}
-}
-
 /* Method run by a task during execution */
 void* execute(void* t) {
 	Task* task = (Task*)t;
@@ -130,7 +119,10 @@ void* execute(void* t) {
 			// Suspend until allowed to run
 			pthread_mutex_lock(&(task->activeMutex));
 			while (!(task->active)) pthread_cond_wait(&(task->activeCondition), &(task->activeMutex));
+			printf("Task %s was started\n", (task->name).c_str());
 			pthread_mutex_unlock(&(task->activeMutex));
+			printf("time in period: %d\n", timeInPeriod(task->period));
+			printf("deadline: %d\n", task->deadline);
 			// Did we miss the deadline?
 			if (timeInPeriod(task->period) > task->deadline) {
 				if (find(missedTasks.begin(), missedTasks.end(), task) == missedTasks.end()) { // If the task is not already in the list of missed-deadline tasks, add it.
@@ -140,6 +132,7 @@ void* execute(void* t) {
 			// Count down
 			double elapsed = elapsedTime();
 			while(elapsed == elapsedTime());
+			printf("task %s counting down 1\n", (task->name).c_str());
 			task->rem_exec_time -= 1;
 			if (task->rem_exec_time == 0) {
 				task->completed = true;
@@ -151,6 +144,7 @@ void* execute(void* t) {
 			}
 		}
 	}
+	return NULL;
 }
 
 /* Scheduler loop  */
@@ -247,9 +241,11 @@ int main(int argc, char *argv[]) {
 	Task* runningTask = tasks.at(0);
 	// Set highest priority task active
 	runningTask->setActive(true);
+	int r_count = 0;
 	while(elapsedTime() < runTime){
 		// Scheduler runs periodically
 		if ( timeInPeriod(SCHEDULER_FREQUENCY) == 0) {
+			r_count++;
 			scheduleTasks();
 			if (tasks.at(0) != runningTask) {
 				// Stop running task
@@ -260,6 +256,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	}
+	printf("Rescheduled %d times\n", r_count);
 	if (missedTasks.size() > 0) {
 		for (int i=0;i<missedTasks.size();i++) {
 			printf("Task %s missed its deadline.\n", (missedTasks.at(i)->name).c_str());

@@ -33,6 +33,9 @@ public:
 	void setActive(bool status){
 		pthread_mutex_lock(&activeMutex);
 		active = status;
+		if (status) {
+			pthread_cond_broadcast(&activeCondition);
+		}
 		pthread_mutex_lock(&activeMutex);
 	}
 
@@ -42,7 +45,6 @@ public:
 		bool status = true;
 		pthread_mutex_lock(&activeMutex);
 		status = active;
-		pthread_cond_broadcast(&activeCondition);
 		pthread_mutex_unlock(&activeMutex);
 		return status;
 	}
