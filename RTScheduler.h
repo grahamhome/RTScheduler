@@ -48,7 +48,7 @@ void LST();
 void scheduleTasks();
 
 /* Return elapsed time since start of scheduler loop in seconds */
-double elapsedTime();
+int elapsedTime();
 
 int timeInPeriod(int period);
 

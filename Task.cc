@@ -36,7 +36,7 @@ public:
 		if (status) {
 			pthread_cond_broadcast(&activeCondition);
 		}
-		pthread_mutex_lock(&activeMutex);
+		pthread_mutex_unlock(&activeMutex);
 	}
 
 	/* Checks master task switch and instance-specific task switch */
