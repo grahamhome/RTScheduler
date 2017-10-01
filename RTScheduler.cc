@@ -1,25 +1,14 @@
-#include <cstdlib>
-#include <iostream>
-#include <Task.cc>
-#include <vector>
-#include <string>
-#include <pthread.h>
-#include <unistd.h>
+/* Scheduler program created by Graham Home and Alberto Castro */
+#include <RTScheduler.h>
+#include <math.h>
 using namespace std;
-
-#define NUM_TASKS 10
-vector<Task*> tasks; // Ordered by priority, high to low
-pthread_mutex_t taskListMutex;
-int algorithm = -1;
-bool tasksRunning = false;
-pthread_mutex_t runMutex;
 
 /* Method run by a task during execution */
 void* execute(void* task) {
 	return NULL;
 }
 
-/* Sets up a new thread */
+/* Set up a new thread */
 void createThread(pthread_t* thread, Task* task) {
 	pthread_attr_t attributes;
 	pthread_attr_init(&attributes);
@@ -55,6 +44,7 @@ void EDF(){
 	pthread_mutex_unlock(&taskListMutex);
 }
 
+/* Assign priorities to all tasks based on SCT algorithm */
 void* SCT(){
 	vector<Task*> orderedTasks;
 	for (int i=0;i<NUM_TASKS;i++){
@@ -78,6 +68,7 @@ void* SCT(){
 	pthread_mutex_unlock(&taskListMutex);
 }
 
+/* Assign priorities to all tasks based on LST algorithm */
 void LST(){
 	vector<Task*> orderedTasks;
 	for (int i=0;i<NUM_TASKS;i++){
@@ -99,6 +90,7 @@ void LST(){
 	pthread_mutex_unlock(&taskListMutex);
 }
 
+/* Schedule tasks using user-specified algorithm */
 void scheduleTasks() {
 	switch(algorithm) {
 	case 0:
@@ -113,24 +105,19 @@ void scheduleTasks() {
 	}
 }
 
-void startAllTasks() {
-	pthread_mutex_lock(&runMutex);
-	tasksRunning = true;
-	pthread_mutex_unlock(&runMutex);
+/* Return elapsed time since start of scheduler loop in seconds */
+double elapsedTime() {
+	return difftime(time(NULL), startTime);
 }
 
-bool checkTasksRunning() {
-	bool running = false;
-	pthread_mutex_lock(&runMutex);
-	running = tasksRunning;
-	pthread_mutex_unlock(&runMutex);
-	return running;
-
-}
-
+/* Scheduler loop  */
 int main(int argc, char *argv[]) {
+	// Ensure no tasks will run yet
+	Task::toggleAll(false);
+	// Set up mutexes
 	pthread_mutex_init(&taskListMutex, NULL);
-	pthread_mutex_init(&runMutex, NULL);
+
+	// Get scheduling algorithm
 	printf("Welcome to the Real-Time Scheduler\n");
 	printf("Scheduling algorithm choices:\n(0) Earliest Deadline First\n(1) Shortest Completion Time\n(2) Least Slack Time\n");
 	printf("Choose a scheduling algorithm (enter the number of your choice): ");
@@ -149,6 +136,8 @@ int main(int argc, char *argv[]) {
 			printf("Least Slack Time\n");
 			break;
 	}
+
+	// Get tasks
 	printf("Enter tasks in the format \'<name> <execution time> <deadline> <period>\' and follow each with a newline.\nTo run tasks, enter \'start\' followed by a newline.\n");
 	string input;
 	getline(cin, input); // Ignore newline from previous println
@@ -200,22 +189,26 @@ int main(int argc, char *argv[]) {
 	}
 
 	//Scheduler section
-	int runTime = 0;
-	int elapsedTime = 0;
 
-	printf("How long would you like to run the simulation for? ");
+	// Get run duration
+	int runTime = 0;
+	printf("How many seconds would you like to run the simulation for? ");
 	cin >> runTime;
 	scheduleTasks();
-	// start highest task
-	//startAllTasks();
+	// Get start time
+	time(&startTime);
 
-	while(elapsedTime < runTime){
-		// Start timer
-		// when timer hits a certain point: reschedule, stop current task, start highest task
-		// Finally: stop all tasks & report status
-		sleep(1);
-		scheduleTasks();
+	// Start all tasks
+	Task::toggleAll(true);
+
+	while(elapsedTime() < runTime){
+		// Scheduler runs periodically
+		if ( fmod(elapsedTime(), (double)SCHEDULER_FREQUENCY) == 0) {
+			scheduleTasks();
+		}
 	}
+
+	// TODO: print stats
 
 	return EXIT_SUCCESS;
 }

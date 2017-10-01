@@ -1,28 +1,12 @@
-#include <string>
-#include <stdlib.h>
-#include <cstdlib>
-#include <pthread.h>
-#include <iostream>
+#include <Task.h>
 using namespace std;
 
-/* Represents a task to be scheduled */
-class Task {
-public:
-		string name;
-		int total_exec_time;
-		int rem_exec_time;
-		int deadline;
-		int period;
-		int priority;
-		pthread_t* thread;
-		bool completed; // completed during this period
-		bool running;
-		pthread_mutex_t runLock;
-
-public:
+// Initialize static class variables
+bool Task::running = false;
+pthread_mutex_t Task::runMutex;
 
 /* Create a task */
-Task(string t_name, int t_exec_time, int t_deadline, int t_period, pthread_t* t_thread) {
+Task::Task(string t_name, int t_exec_time, int t_deadline, int t_period, pthread_t* t_thread) {
 	name = t_name;
 	total_exec_time = t_exec_time;
 	rem_exec_time = t_exec_time;
@@ -30,34 +14,28 @@ Task(string t_name, int t_exec_time, int t_deadline, int t_period, pthread_t* t_
 	period = t_period;
 	thread = t_thread;
 	completed = false;
-	running = false;
-	priority =  1;
-	pthread_mutex_init(&runLock, NULL);
+	pthread_mutex_init(&activeMutex, NULL);
+	pthread_mutex_init(&runMutex, NULL);
 }
 
-/* Set the task's priority */
-void setPriority(int new_priority) {
-	pthread_setschedprio(*thread, new_priority);
-	//For testing purposes
-	struct sched_param* param;
-	pthread_getschedparam(*thread, NULL, param);
-	printf("%s is at priority %d", name.c_str(), param->sched_priority);
+/* Start or stop this task */
+void Task::setActive(bool status){
+	pthread_mutex_lock(&activeMutex);
+	active = status;
+	pthread_mutex_lock(&activeMutex);
 }
 
-void setRun(bool status){
-	pthread_mutex_lock(&runLock);
-	running = status;
-	pthread_mutex_lock(&runLock);
-}
-
-bool canRun() {
-	bool status;
-	pthread_mutex_lock(&runLock);
+/* Checks master task switch and instance-specific task switch */
+bool Task::canRun() {
+	bool status = true;
+	pthread_mutex_lock(&runMutex);
 	status = running;
-	pthread_mutex_lock(&runLock);
+	pthread_mutex_unlock(&runMutex);
+	pthread_mutex_lock(&activeMutex);
+	if (!active) status = false;
+	pthread_mutex_lock(&activeMutex);
 	return status;
 }
-};
 
 
 		
