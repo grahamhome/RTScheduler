@@ -27,6 +27,8 @@ int algorithm = -1; // Number used to select the scheduling algorithm
 
 time_t startTime;
 
+int runTime; // Length of time to run the scheduler for
+
 /* Method run by a task during execution */
 void* execute(void* task);
 

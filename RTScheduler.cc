@@ -18,7 +18,7 @@ void createThread(pthread_t* thread, Task* task) {
 /* Assign priorities to all tasks based on EDF algorithm */
 void EDF(){
 	vector<Task*> orderedTasks;
-	for (int i=0;i<NUM_TASKS;i++){
+	for (int i=0;i<tasks.size();i++){
 		Task* task = tasks.at(i);
 		int t;
 		for (t=0;t<orderedTasks.size();t++) {
@@ -124,9 +124,13 @@ void toggleAll(bool run) {
 void* execute(void* t) {
 	Task* task = (Task*)t;
 	int periodCount = 0;
-	while(!(task->canRun()));
-	while(task->canRun()) {
+	while(elapsedTime() < runTime) {
+		// Has the task already completed during this period?
 		while (!(task->completed)) {
+			// Suspend until allowed to run
+			pthread_mutex_lock(&(task->activeMutex));
+			while (!(task->active)) pthread_cond_wait(&(task->activeCondition), &(task->activeMutex));
+			pthread_mutex_unlock(&(task->activeMutex));
 			// Did we miss the deadline?
 			if (timeInPeriod(task->period) > task->deadline) {
 				if (find(missedTasks.begin(), missedTasks.end(), task) == missedTasks.end()) { // If the task is not already in the list of missed-deadline tasks, add it.
@@ -143,7 +147,7 @@ void* execute(void* t) {
 		}
 		while (task->completed) {
 			if (periodCounter(task->period) > periodCount) {
-				task->completed == false;
+				task->completed = false;
 			}
 		}
 	}
@@ -220,7 +224,6 @@ int main(int argc, char *argv[]) {
 		} else {
 			pthread_t* taskThread = NULL;
 			Task* task = new Task(name, c, p, d, taskThread);
-			createThread(taskThread, task);
 			tasks.push_back(task);
 			tokenCount = 0;
 		}
@@ -229,7 +232,6 @@ int main(int argc, char *argv[]) {
 	//Scheduler section
 
 	// Get run duration
-	int runTime = 0;
 	printf("How many seconds would you like to run the simulation for? ");
 	cin >> runTime;
 	printf("Running tasks...\n");
@@ -237,13 +239,25 @@ int main(int argc, char *argv[]) {
 	// Get start time
 	time(&startTime);
 
-	// Start all tasks
-	toggleAll(true);
-
+	// Start all task threads (inactive by default)
+	for (int i=0;i<tasks.size();i++) {
+		Task* t = tasks.at(i);
+		createThread(t->thread, t);
+	}
+	Task* runningTask = tasks.at(0);
+	// Set highest priority task active
+	runningTask->setActive(true);
 	while(elapsedTime() < runTime){
 		// Scheduler runs periodically
 		if ( timeInPeriod(SCHEDULER_FREQUENCY) == 0) {
 			scheduleTasks();
+			if (tasks.at(0) != runningTask) {
+				// Stop running task
+				runningTask->setActive(false);
+				// Start highest priority task
+				runningTask = tasks.at(0);
+				runningTask->setActive(true);
+			}
 		}
 	}
 	if (missedTasks.size() > 0) {

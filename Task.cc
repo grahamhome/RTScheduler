@@ -1,5 +1,6 @@
 #include <string>
 #include <pthread.h>
+#include <unistd.h>
 using namespace std;
 
 class Task {
@@ -13,6 +14,7 @@ public:
 	bool completed; // completed during this period
 	bool active; // indicates whether or not this particular task is active
 	pthread_mutex_t activeMutex;
+	pthread_cond_t activeCondition;
 
 	Task(string t_name, int t_exec_time, int t_deadline, int t_period, pthread_t* t_thread) {
 		name = t_name;
@@ -24,6 +26,7 @@ public:
 		completed = false;
 		active = false;
 		pthread_mutex_init(&activeMutex, NULL);
+		pthread_cond_init(&activeCondition, NULL);
 	}
 
 	/* Start or stop this task */
@@ -35,10 +38,12 @@ public:
 
 	/* Checks master task switch and instance-specific task switch */
 	bool canRun() {
+		sleep(1);
 		bool status = true;
 		pthread_mutex_lock(&activeMutex);
 		status = active;
-		pthread_mutex_lock(&activeMutex);
+		pthread_cond_broadcast(&activeCondition);
+		pthread_mutex_unlock(&activeMutex);
 		return status;
 	}
 };
