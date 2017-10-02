@@ -16,16 +16,8 @@ void createThread(pthread_t* thread, Task* task) {
 }
 
 /* Return elapsed time since start of scheduler loop in seconds */
-double elapsedTime() {
-	return difftime(time(NULL), startTime);
-}
-
-int periodCounter(int periodDuration) {
-	return elapsedTime()/periodDuration;
-}
-
-int timeInPeriod(int periodDuration) {
-	return elapsedTime() - (periodDuration*periodCounter(periodDuration));
+int elapsedTime() {
+	return (int)(difftime(time(NULL), startTime) + 0.5); // Ensure value is properly rounded
 }
 
 /* Method run by a task during execution */
@@ -34,31 +26,30 @@ void* execute(void* t) {
 	int periodCount = 0;
 	while(elapsedTime() < runTime) {
 		// Has the task already completed during this period?
+		int lastRunTime = 0;
 		while (!(task->completed)) {
-			// Suspend until allowed to run
-			pthread_mutex_lock(&(task->activeMutex));
-			while (!(task->active)) pthread_cond_wait(&(task->activeCondition), &(task->activeMutex));
-			printf("Task %s was started\n", (task->name).c_str());
-			pthread_mutex_unlock(&(task->activeMutex));
-			printf("time in period: %d\n", timeInPeriod(task->period));
-			printf("deadline: %d\n", task->deadline);
-			// Did we miss the deadline?
-			if (timeInPeriod(task->period) > task->deadline) {
-				if (find(missedTasks.begin(), missedTasks.end(), task) == missedTasks.end()) { // If the task is not already in the list of missed-deadline tasks, add it.
-					missedTasks.push_back(task);
+			int currentTime = elapsedTime();
+			if (currentTime != lastRunTime) {
+				lastRunTime = currentTime;
+				// Suspend until allowed to run
+				pthread_mutex_lock(&(task->activeMutex));
+				while (!(task->active)) pthread_cond_wait(&(task->activeCondition), &(task->activeMutex));
+				pthread_mutex_unlock(&(task->activeMutex));
+				// Did we miss the deadline?
+				if (elapsedTime()/task->period > periodCount || currentTime % task->period > task->deadline) {
+					if (find(missedTasks.begin(), missedTasks.end(), task) == missedTasks.end()) { // If the task is not already in the list of missed-deadline tasks, add it.
+						missedTasks.push_back(task);
+					}
 				}
-			}
-			// Count down
-			double elapsed = elapsedTime();
-			while(elapsed == elapsedTime());
-			printf("task %s counting down 1\n", (task->name).c_str());
-			task->rem_exec_time -= 1;
-			if (task->rem_exec_time == 0) {
-				task->completed = true;
+				task->rem_exec_time -= 1;
+				if (task->rem_exec_time == 0) {
+					task->completed = true;
+					task->rem_exec_time = task->total_exec_time;
+				}
 			}
 		}
 		while (task->completed) {
-			if (periodCounter(task->period) > periodCount) {
+			if (elapsedTime()/task->period > periodCount) {
 				task->completed = false;
 			}
 		}
@@ -231,19 +222,27 @@ int main(int argc, char *argv[]) {
 	// Get start time
 	time(&startTime);
 
+	// Set highest priority task active
+	Task* runningTask = tasks.at(0);
+	runningTask->setActive(true);
 	// Start all task threads (inactive by default)
 	for (int i=0;i<tasks.size();i++) {
 		Task* t = tasks.at(i);
 		createThread(t->thread, t);
 	}
+<<<<<<< HEAD
 
 	Task* runningTask = tasks.at(0);
 	// Set highest priority task active
 	runningTask->setActive(true);
+=======
+	int lastCheckedTime = elapsedTime();
+>>>>>>> 3dca64b2ae29aa60279a0d84510712caf8ae2f70
 	int r_count = 0;
 	while(elapsedTime() < runTime){
 		// Scheduler runs periodically
-		if ( timeInPeriod(SCHEDULER_FREQUENCY) == 0) {
+		int currentTime = elapsedTime();
+		if ((currentTime != lastCheckedTime) && (currentTime % SCHEDULER_FREQUENCY == 0) ) {
 			r_count++;
 			scheduleTasks(runningTask);
 			if (tasks.at(0) != runningTask) {
@@ -258,6 +257,11 @@ int main(int argc, char *argv[]) {
 				}
 			}
 		}
+		lastCheckedTime = currentTime;
+	}
+	// Stop all tasks
+	for (int i=0;i<tasks.size();i++) {
+		tasks.at(i)->setActive(false);
 	}
 	printf("Rescheduled %d times\n", r_count);
 	if (missedTasks.size() > 0) {

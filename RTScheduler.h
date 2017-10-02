@@ -42,7 +42,7 @@ void createThread(pthread_t* thread, Task* task);
 void scheduleTasks(Task* active_task);
 
 /* Return elapsed time since start of scheduler loop in seconds */
-double elapsedTime();
+int elapsedTime();
 
 int timeInPeriod(int period);
 
