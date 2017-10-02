@@ -1,4 +1,4 @@
-/* Scheduler program created by Graham Home and Alberto Castro */
+/* Scheduler program created by Graham Home and Alberto Santos-Castro */
 #include <RTScheduler.h>
 #include <algorithm>
 using namespace std;
@@ -13,87 +13,6 @@ void createThread(pthread_t* thread, Task* task) {
 	param.sched_priority = priority;
 	pthread_attr_setschedparam(&attributes, &param);
 	pthread_create(thread, &attributes, execute, (void*)task);
-}
-
-/* Assign priorities to all tasks based on EDF algorithm */
-void EDF(){
-	vector<Task*> orderedTasks;
-	for (int i=0;i<tasks.size();i++){
-		Task* task = tasks.at(i);
-		int t;
-		for (t=0;t<orderedTasks.size();t++) {
-			if (orderedTasks.at(t)->deadline > task->deadline) {
-				break;
-			}
-		}
-		orderedTasks.insert(orderedTasks.begin()+t, task);
-	}
-	/* Lock the active tasks list mutex
-	 * so no task threads will try to select
-	 * the next task from the list while we are rebuilding it
-	 */
-	pthread_mutex_lock(&taskListMutex);
-	tasks = orderedTasks;
-	pthread_mutex_unlock(&taskListMutex);
-}
-
-/* Assign priorities to all tasks based on SCT algorithm */
-void SCT(){
-	vector<Task*> orderedTasks;
-	for (int i=0;i<NUM_TASKS;i++){
-		Task* task = tasks.at(i);
-		int t;
-		for (t=0;t<orderedTasks.size();t++) {
-			if (orderedTasks.at(t)->rem_exec_time > task->rem_exec_time) {
-				break;
-			}
-		}
-		orderedTasks.insert(orderedTasks.begin()+t, task);
-	}
-	/* Lock the active tasks list mutex
-	 * so no task threads will try to select
-	 * the next task from the list while we are rebuilding it
-	 */
-	pthread_mutex_lock(&taskListMutex);
-	tasks = orderedTasks;
-	pthread_mutex_unlock(&taskListMutex);
-}
-
-/* Assign priorities to all tasks based on LST algorithm */
-void LST(){
-	vector<Task*> orderedTasks;
-	for (int i=0;i<NUM_TASKS;i++){
-		Task* task = tasks.at(i);
-		int t;
-		for (t=0;t<orderedTasks.size();t++) {
-			if (orderedTasks.at(t)->deadline-orderedTasks.at(t)->rem_exec_time > task->deadline-task->rem_exec_time) {
-				break;
-			}
-		}
-		orderedTasks.insert(orderedTasks.begin()+t, task);
-	}
-	/* Lock the active tasks list mutex
-	 * so no task threads will try to select
-	 * the next task from the list while we are rebuilding it
-	 */
-	pthread_mutex_lock(&taskListMutex);
-	tasks = orderedTasks;
-	pthread_mutex_unlock(&taskListMutex);
-}
-
-/* Schedule tasks using user-specified algorithm */
-void scheduleTasks() {
-	switch(algorithm) {
-	case 0:
-		EDF();
-		break;
-	case 1:
-		SCT();
-		break;
-	case 2:
-		LST();
-		break;
-	}
 }
 
 /* Return elapsed time since start of scheduler loop in seconds */
@@ -147,6 +66,88 @@ void* execute(void* t) {
 	return NULL;
 }
 
+/* Schedule tasks using user-specified algorithm */
+void scheduleTasks(Task* active_task){
+	vector<Task*> orderedTasks;
+	Task* task;
+
+	if ((active_task != NULL) && (!active_task->completed)){
+		/* If current Active Task has equal priority to others
+		 * select current active task as priority task
+		 * * */
+
+		pthread_mutex_lock(&taskListMutex);
+		orderedTasks.insert(orderedTasks.begin, active_task);
+		pthread_mutex_unlock(&taskListMutex);
+	}
+
+	switch(algorithm){
+	case EDF:
+		for (int i=0;i<tasks.size();i++){
+			task = tasks.at(i);
+			int t;
+			if(task!=active_task && !task->completed){
+				for (t=0;t<orderedTasks.size();t++) {
+					if ((orderedTasks.at(t)->deadline - (elapsedTime() % orderedTasks.at(t)->period)) > (task->deadline-(elapsedTime() % task.orderedTasks.at(t)))) {
+						break;
+					}
+				}
+				orderedTasks.insert(orderedTasks.begin()+t, task);
+			}
+		}
+		break;
+	case SCT:
+		for (int i=0;i<NUM_TASKS;i++){
+			Task* task = tasks.at(i);
+			int t;
+			if(task!=active_task && !task->completed){
+				for (t=0;t<orderedTasks.size();t++) {
+					if (orderedTasks.at(t)->rem_exec_time > task->rem_exec_time) {
+						break;
+					}
+				}
+				orderedTasks.insert(orderedTasks.begin()+t, task);
+			}
+		}
+		break;
+	case LST:
+		for (int i=0;i<NUM_TASKS;i++){
+			Task* task = tasks.at(i);
+			int t;
+			if(task!=active_task && !task->completed){
+				for (t=0;t<orderedTasks.size();t++) {
+					if (orderedTasks.at(t)->deadline-orderedTasks.at(t)->rem_exec_time > task->deadline-task->rem_exec_time) {
+						break;
+					}
+				}
+				orderedTasks.insert(orderedTasks.begin()+t, task);
+			}
+		}
+		break;
+	}
+
+	for (int i=0;i<tasks.size();i++){
+		Task* task = tasks.at(i);
+		int t;
+		for (t=0;t<orderedTasks.size();t++) {
+			if (orderedTasks.at(t)->deadline > task->deadline) {
+				break;
+			}
+		}
+		if(task!=active_task){
+			orderedTasks.insert(orderedTasks.begin()+t, task);
+		}
+	}
+
+	/* Lock the active tasks list mutex
+	 * so no task threads will try to select
+	 * the next task from the list while we are rebuilding it
+	 */
+	pthread_mutex_lock(&taskListMutex);
+	tasks = orderedTasks;
+	pthread_mutex_unlock(&taskListMutex);
+}
+
 /* Scheduler loop  */
 int main(int argc, char *argv[]) {
 	// Set up mutexes
@@ -159,15 +160,16 @@ int main(int argc, char *argv[]) {
 	while (!(algorithm>=0 && algorithm <=2)) {
 		cin >> algorithm;
 	}
+
 	printf("You selected ");
 	switch(algorithm) {
-	case 0:
+	case EDF:
 			printf("Earliest Deadline First\n");
 			break;
-	case 1:
+	case SCT:
 			printf("Shortest Completion Time\n");
 			break;
-	case 2:
+	case LST:
 			printf("Least Slack Time\n");
 			break;
 	}
@@ -229,7 +231,7 @@ int main(int argc, char *argv[]) {
 	printf("How many seconds would you like to run the simulation for? ");
 	cin >> runTime;
 	printf("Running tasks...\n");
-	scheduleTasks();
+	scheduleTasks(runningTask);
 	// Get start time
 	time(&startTime);
 
@@ -238,6 +240,7 @@ int main(int argc, char *argv[]) {
 		Task* t = tasks.at(i);
 		createThread(t->thread, t);
 	}
+
 	Task* runningTask = tasks.at(0);
 	// Set highest priority task active
 	runningTask->setActive(true);
@@ -246,13 +249,17 @@ int main(int argc, char *argv[]) {
 		// Scheduler runs periodically
 		if ( timeInPeriod(SCHEDULER_FREQUENCY) == 0) {
 			r_count++;
-			scheduleTasks();
+			scheduleTasks(runningTask);
 			if (tasks.at(0) != runningTask) {
 				// Stop running task
 				runningTask->setActive(false);
 				// Start highest priority task
-				runningTask = tasks.at(0);
-				runningTask->setActive(true);
+				if(tasks.size()>0){
+					runningTask = tasks.at(0);
+					runningTask->setActive(true);
+				}else{
+					printf("at time %d all tasks completed!", elapsedTime());
+				}
 			}
 		}
 	}

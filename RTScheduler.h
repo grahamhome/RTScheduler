@@ -14,7 +14,10 @@
 #include <unistd.h>
 #include <time.h>
 
-#define NUM_TASKS 10
+#define NUM_TASKS 	10
+#define EDF			0
+#define SCT			1
+#define LST			2
 #define SCHEDULER_FREQUENCY 5 // Number of seconds between each run of the scheduler
 
 // Program globals
@@ -35,17 +38,8 @@ void* execute(void* task);
 /* Set up a new thread */
 void createThread(pthread_t* thread, Task* task);
 
-/* Assign priorities to all tasks based on EDF algorithm */
-void EDF();
-
-/* Assign priorities to all tasks based on SCT algorithm */
-void SCT();
-
-/* Assign priorities to all tasks based on LST algorithm */
-void LST();
-
 /* Schedule tasks using user-specified algorithm */
-void scheduleTasks();
+void scheduleTasks(Task* active_task);
 
 /* Return elapsed time since start of scheduler loop in seconds */
 double elapsedTime();
