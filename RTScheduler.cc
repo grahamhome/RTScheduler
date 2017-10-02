@@ -117,16 +117,13 @@ void* execute(void* t) {
 				while (!(task->active)) pthread_cond_wait(&(task->activeCondition), &(task->activeMutex));
 				pthread_mutex_unlock(&(task->activeMutex));
 				// Did we miss the deadline?
-				if (currentTime % task->period > task->deadline) { //TODO: Not detecting missed deadlines if period == deadline
-					printf("Task %d missed a deadline\n", (task->name).c_str());
+				if (elapsedTime()/task->period > periodCount || currentTime % task->period > task->deadline) {
 					if (find(missedTasks.begin(), missedTasks.end(), task) == missedTasks.end()) { // If the task is not already in the list of missed-deadline tasks, add it.
 						missedTasks.push_back(task);
 					}
 				}
-				printf("task %s counting down 1\n", (task->name).c_str());
 				task->rem_exec_time -= 1;
 				if (task->rem_exec_time == 0) {
-					printf("Task %s completed\n", (task->name).c_str());
 					task->completed = true;
 					task->rem_exec_time = task->total_exec_time;
 				}
@@ -252,6 +249,10 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		lastCheckedTime = currentTime;
+	}
+	// Stop all tasks
+	for (int i=0;i<tasks.size();i++) {
+		tasks.at(i)->setActive(false);
 	}
 	printf("Rescheduled %d times\n", r_count);
 	if (missedTasks.size() > 0) {
