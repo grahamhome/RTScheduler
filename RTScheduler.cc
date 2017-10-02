@@ -70,6 +70,7 @@ void* execute(void* t) {
 void scheduleTasks(Task* active_task){
 	vector<Task*> orderedTasks;
 	Task* task;
+	int elapsed_time = elapsedTime();
 
 	if ((active_task != NULL) && (!active_task->completed)){
 		/* If current Active Task has equal priority to others
@@ -88,7 +89,7 @@ void scheduleTasks(Task* active_task){
 			int t;
 			if(task!=active_task && !task->completed){
 				for (t=0;t<orderedTasks.size();t++) {
-					if ((orderedTasks.at(t)->deadline - (elapsedTime() % orderedTasks.at(t)->period)) > (task->deadline-(elapsedTime() % task.orderedTasks.at(t)))) {
+					if ((orderedTasks.at(t)->deadline - (elapsed_time % orderedTasks.at(t)->period)) > (task->deadline-(elapsed_time % task.orderedTasks.at(t)))) {
 						break;
 					}
 				}
