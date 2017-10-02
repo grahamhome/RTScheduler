@@ -193,25 +193,20 @@ int main(int argc, char *argv[]) {
 		int tokenCount = 0;
 		size_t pos = 0;
 		while (((pos = input.find(" ")) <= string::npos) && tokenCount < 4) {
-			switch(tokenCount) {
+			switch(tokenCount++) {
 			case 0:
 				name = input.substr(0, pos);
-				tokenCount++;
 				break;
 			case 1:
 				c = atoi(input.substr(0, pos).c_str());
-				tokenCount++;
 				break;
 			case 2:
 				p = atoi(input.substr(0, pos).c_str());
-				tokenCount++;
 				break;
 			case 3:
 				d = atoi(input.substr(0, pos).c_str());
-				tokenCount++;
 				break;
 			default:
-				tokenCount++;
 				break;
 			}
 			input.erase(0, pos+1);
