@@ -3,6 +3,8 @@
 #include <unistd.h>
 using namespace std;
 
+#define PRINT_ACTIVE true
+
 class Task {
 public:
 	string name;
@@ -33,9 +35,11 @@ public:
 	void setActive(bool status){
 		pthread_mutex_lock(&activeMutex);
 		active = status;
+		/*
 		if (status) {
 			pthread_cond_broadcast(&activeCondition);
 		}
+		*/
 		pthread_mutex_unlock(&activeMutex);
 	}
 

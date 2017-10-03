@@ -14,11 +14,11 @@
 #include <unistd.h>
 #include <time.h>
 
-#define NUM_TASKS 	10
-#define EDF			0
-#define SCT			1
-#define LST			2
-#define SCHEDULER_FREQUENCY 5 // Number of seconds between each run of the scheduler
+#define EDF				0
+#define SCT				1
+#define LST				2
+#define PRINT_ACTIVE 	true
+#define SCHEDULER_FREQUENCY 1 // Number of seconds between each run of the scheduler
 
 // Program globals
 vector<Task*> tasks; // Ordered by priority, high to low

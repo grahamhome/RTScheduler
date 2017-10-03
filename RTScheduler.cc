@@ -23,35 +23,55 @@ int elapsedTime() {
 /* Method run by a task during execution */
 void* execute(void* t) {
 	Task* task = (Task*)t;
-	int periodCount = 0;
-	while(elapsedTime() < runTime) {
+	int lastRunTime = 0;
+	int currentTime = elapsedTime();
+	while(elapsedTime() <= runTime) {
 		// Has the task already completed during this period?
-		int lastRunTime = 0;
 		while (!(task->completed)) {
-			int currentTime = elapsedTime();
-			if (currentTime != lastRunTime) {
-				lastRunTime = currentTime;
+			currentTime = elapsedTime();
+
+			while(currentTime == lastRunTime)
+				currentTime = elapsedTime();
+			if(elapsedTime() > runTime)
+				break;
 				// Suspend until allowed to run
-				pthread_mutex_lock(&(task->activeMutex));
-				while (!(task->active)) pthread_cond_wait(&(task->activeCondition), &(task->activeMutex));
-				pthread_mutex_unlock(&(task->activeMutex));
+				//pthread_mutex_lock(&(task->activeMutex));
+				//printf("\n%s reached point A!!", task->name.c_str());
+				//while (!(task->active)) pthread_cond_wait(&(task->activeCondition), &(task->activeMutex));
+				//printf("\n%s reached point B!!", task->name.c_str());
+				//pthread_mutex_unlock(&(task->activeMutex));
+				lastRunTime = currentTime;
+				if(task->active){
+					task->rem_exec_time -= 1;
+					if(PRINT_ACTIVE)printf("\n%s: remaining time %d : %d",task->name.c_str(), task->rem_exec_time);
+				}
+
 				// Did we miss the deadline?
-				if (elapsedTime()/task->period > periodCount || currentTime % task->period > task->deadline) {
+				if (((currentTime % task->period == 0 )||(currentTime % task->period >= task->deadline))&&(task->rem_exec_time != 0)) {
+					if(PRINT_ACTIVE) printf("\n*** %s Missed the deadline! after %d seconds", task->name.c_str(), currentTime);
 					if (find(missedTasks.begin(), missedTasks.end(), task) == missedTasks.end()) { // If the task is not already in the list of missed-deadline tasks, add it.
 						missedTasks.push_back(task);
 					}
 				}
-				task->rem_exec_time -= 1;
+
 				if (task->rem_exec_time == 0) {
 					task->completed = true;
+					if(PRINT_ACTIVE)printf("\n-->%s Completed after %d seconds", task->name.c_str(), currentTime);
+				}
+
+				if (elapsedTime() % task->period == 0 ){
 					task->rem_exec_time = task->total_exec_time;
 				}
-			}
 		}
 		while (task->completed) {
-			if (elapsedTime()/task->period > periodCount) {
+			if(elapsedTime() > runTime)
+				break;
+
+			if (elapsedTime()% task->period == 0) {
 				task->completed = false;
+				task->rem_exec_time = task->total_exec_time;
 			}
+			lastRunTime = elapsedTime();
 		}
 	}
 	return NULL;
@@ -63,24 +83,17 @@ void scheduleTasks(Task* active_task){
 	Task* task;
 	int elapsed_time = elapsedTime();
 
-	if ((active_task != NULL) && (!active_task->completed)){
-		/* If current Active Task has equal priority to others
-		 * select current active task as priority task
-		 * * */
-
-		pthread_mutex_lock(&taskListMutex);
-		orderedTasks.insert(orderedTasks.begin, active_task);
-		pthread_mutex_unlock(&taskListMutex);
-	}
-
 	switch(algorithm){
 	case EDF:
-		for (int i=0;i<tasks.size();i++){
+		for (unsigned int i=0;i<tasks.size();i++){
 			task = tasks.at(i);
-			int t;
-			if(task!=active_task && !task->completed){
+			unsigned int t;
+			// Insert completed tasks at the end of the list
+			if(task->completed){
+				orderedTasks.push_back(task);
+			} else {
 				for (t=0;t<orderedTasks.size();t++) {
-					if ((orderedTasks.at(t)->deadline - (elapsed_time % orderedTasks.at(t)->period)) > (task->deadline-(elapsed_time % task.orderedTasks.at(t)))) {
+					if ((orderedTasks.at(t)->completed)||((orderedTasks.at(t)->deadline - (elapsed_time % orderedTasks.at(t)->period)) > (task->deadline-(elapsed_time % task->period)))) {
 						break;
 					}
 				}
@@ -89,12 +102,15 @@ void scheduleTasks(Task* active_task){
 		}
 		break;
 	case SCT:
-		for (int i=0;i<NUM_TASKS;i++){
+		for (unsigned int i=0;i<tasks.size();i++){
 			Task* task = tasks.at(i);
-			int t;
-			if(task!=active_task && !task->completed){
+			unsigned int t;
+			// Insert completed tasks at the end of the list
+			if(task->completed){
+				orderedTasks.push_back(task);
+			} else {
 				for (t=0;t<orderedTasks.size();t++) {
-					if (orderedTasks.at(t)->rem_exec_time > task->rem_exec_time) {
+					if ((orderedTasks.at(t)->completed)||(orderedTasks.at(t)->rem_exec_time > task->rem_exec_time)) {
 						break;
 					}
 				}
@@ -103,12 +119,15 @@ void scheduleTasks(Task* active_task){
 		}
 		break;
 	case LST:
-		for (int i=0;i<NUM_TASKS;i++){
+		for (unsigned int i=0;i<tasks.size();i++){
 			Task* task = tasks.at(i);
-			int t;
-			if(task!=active_task && !task->completed){
+			unsigned int t;
+			// Insert completed tasks at the end of the list
+			if(task->completed){
+				orderedTasks.push_back(task);
+			} else {
 				for (t=0;t<orderedTasks.size();t++) {
-					if (orderedTasks.at(t)->deadline-orderedTasks.at(t)->rem_exec_time > task->deadline-task->rem_exec_time) {
+					if ((orderedTasks.at(t)->completed)||(orderedTasks.at(t)->deadline-orderedTasks.at(t)->rem_exec_time > task->deadline-task->rem_exec_time)) {
 						break;
 					}
 				}
@@ -116,19 +135,6 @@ void scheduleTasks(Task* active_task){
 			}
 		}
 		break;
-	}
-
-	for (int i=0;i<tasks.size();i++){
-		Task* task = tasks.at(i);
-		int t;
-		for (t=0;t<orderedTasks.size();t++) {
-			if (orderedTasks.at(t)->deadline > task->deadline) {
-				break;
-			}
-		}
-		if(task!=active_task){
-			orderedTasks.insert(orderedTasks.begin()+t, task);
-		}
 	}
 
 	/* Lock the active tasks list mutex
@@ -167,7 +173,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Get tasks
-	printf("Enter tasks in the format \'<name> <execution time> <deadline> <period>\' and follow each with a newline.\nTo run tasks, enter \'start\' followed by a newline.\n");
+	printf("\nEnter tasks in the format \'<name> <execution time> <deadline> <period>\' and follow each with a newline.\nTo run tasks, enter \'start\' followed by a newline.\n");
 	string input;
 	getline(cin, input); // Ignore newline from previous println
 	bool done = false;
@@ -175,6 +181,18 @@ int main(int argc, char *argv[]) {
 		getline(cin, input);
 		if (input == "start") {
 			done = true;
+			break;
+		}else if(input == "test" || input == "0"){
+			//Default values for debugging purposes
+			pthread_t* myThread1 = NULL;
+			pthread_t* myThread2 = NULL;
+			pthread_t* myThread3 = NULL;
+			Task* task1 = new Task("Task1", 1, 1, 1, myThread1);
+			Task* task2 = new Task("Task2", 2, 2, 2, myThread2);
+			Task* task3 = new Task("Task3", 3, 3, 3, myThread3);
+			tasks.push_back(task1);
+			tasks.push_back(task2);
+			tasks.push_back(task3);
 			break;
 		}
 		string name;
@@ -213,59 +231,62 @@ int main(int argc, char *argv[]) {
 	}
 
 	//Scheduler section
-
 	// Get run duration
 	printf("How many seconds would you like to run the simulation for? ");
 	cin >> runTime;
 	printf("Running tasks...\n");
-	scheduleTasks(runningTask);
+
+
 	// Get start time
 	time(&startTime);
-
+	if(PRINT_ACTIVE)printf("\n-------------------------------\n START:");
 	// Set highest priority task active
+	scheduleTasks(NULL);
 	Task* runningTask = tasks.at(0);
-	runningTask->setActive(true);
 	// Start all task threads (inactive by default)
-	for (int i=0;i<tasks.size();i++) {
+	for (unsigned int i=0;i<tasks.size();i++) {
 		Task* t = tasks.at(i);
 		createThread(t->thread, t);
+		if(PRINT_ACTIVE)printf("\n%s Thread created!", t->name.c_str());
 	}
-<<<<<<< HEAD
-
-	Task* runningTask = tasks.at(0);
-	// Set highest priority task active
 	runningTask->setActive(true);
-=======
+	if(PRINT_ACTIVE)printf("\n--> %s Active task! at time %d", (runningTask->name).c_str(), elapsedTime());
 	int lastCheckedTime = elapsedTime();
->>>>>>> 3dca64b2ae29aa60279a0d84510712caf8ae2f70
 	int r_count = 0;
-	while(elapsedTime() < runTime){
+	while(elapsedTime() <= runTime){
 		// Scheduler runs periodically
 		int currentTime = elapsedTime();
-		if ((currentTime != lastCheckedTime) && (currentTime % SCHEDULER_FREQUENCY == 0) ) {
+		while(currentTime == lastCheckedTime)
+			currentTime = elapsedTime();
+
 			r_count++;
 			scheduleTasks(runningTask);
-			if (tasks.at(0) != runningTask) {
+
+			if (tasks.at(0)->completed){
+				runningTask->setActive(false);
+				printf("\nAt time %d all tasks completed!", elapsedTime());
+			}
+			else if (tasks.at(0) != runningTask) {
 				// Stop running task
 				runningTask->setActive(false);
+				if(PRINT_ACTIVE)printf("\n*** %s No longer running!", (runningTask->name).c_str());
 				// Start highest priority task
-				if(tasks.size()>0){
-					runningTask = tasks.at(0);
-					runningTask->setActive(true);
-				}else{
-					printf("at time %d all tasks completed!", elapsedTime());
-				}
+				runningTask = tasks.at(0);
+				runningTask->setActive(true);
+				if(PRINT_ACTIVE)printf("\n--> %s Active task at time %d!", (runningTask->name).c_str(), elapsedTime());
 			}
-		}
+
 		lastCheckedTime = currentTime;
 	}
 	// Stop all tasks
-	for (int i=0;i<tasks.size();i++) {
+	for (unsigned int i=0;i<tasks.size();i++) {
 		tasks.at(i)->setActive(false);
 	}
-	printf("Rescheduled %d times\n", r_count);
+
+	if(PRINT_ACTIVE)printf("\n-------------------------------\n RESULTS:");
+	printf("\nRescheduled %d times\n", r_count);
 	if (missedTasks.size() > 0) {
-		for (int i=0;i<missedTasks.size();i++) {
+		for (unsigned int i=0;i<missedTasks.size();i++) {
 			printf("Task %s missed its deadline.\n", (missedTasks.at(i)->name).c_str());
 		}
 	} else {
