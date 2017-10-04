@@ -35,17 +35,13 @@ void* execute(void* t) {
 			if(elapsedTime() > runTime)
 				break;
 				// Suspend until allowed to run
-				//pthread_mutex_lock(&(task->activeMutex));
-				//printf("\n%s reached point A!!", task->name.c_str());
-				//while (!(task->active)) pthread_cond_wait(&(task->activeCondition), &(task->activeMutex));
-				//printf("\n%s reached point B!!", task->name.c_str());
-				//pthread_mutex_unlock(&(task->activeMutex));
+				pthread_mutex_lock(&(task->activeMutex));
+				while (!(task->active)) pthread_cond_wait(&(task->activeCondition), &(task->activeMutex));
+				pthread_mutex_unlock(&(task->activeMutex));
+				currentTime = elapsedTime();
 				lastRunTime = currentTime;
-				if(task->active){
-					task->rem_exec_time -= 1;
-					if(PRINT_ACTIVE)printf("\n%s: remaining time %d : %d",task->name.c_str(), task->rem_exec_time);
-				}
 
+				task->rem_exec_time -= 1;
 				// Did we miss the deadline?
 				if (((currentTime % task->period == 0 )||(currentTime % task->period >= task->deadline))&&(task->rem_exec_time != 0)) {
 					if(PRINT_ACTIVE) printf("\n*** %s Missed the deadline! after %d seconds", task->name.c_str(), currentTime);
@@ -56,7 +52,7 @@ void* execute(void* t) {
 
 				if (task->rem_exec_time == 0) {
 					task->completed = true;
-					if(PRINT_ACTIVE)printf("\n-->%s Completed after %d seconds", task->name.c_str(), currentTime);
+					//if(PRINT_ACTIVE)printf("\n-->%s Completed after %d seconds", task->name.c_str(), currentTime);
 				}
 
 				if (elapsedTime() % task->period == 0 ){
@@ -71,7 +67,8 @@ void* execute(void* t) {
 				task->completed = false;
 				task->rem_exec_time = task->total_exec_time;
 			}
-			lastRunTime = elapsedTime();
+			currentTime = elapsedTime();
+			lastRunTime = currentTime;
 		}
 	}
 	return NULL;
@@ -269,11 +266,11 @@ int main(int argc, char *argv[]) {
 			else if (tasks.at(0) != runningTask) {
 				// Stop running task
 				runningTask->setActive(false);
-				if(PRINT_ACTIVE)printf("\n*** %s No longer running!", (runningTask->name).c_str());
+				//if(PRINT_ACTIVE)printf("\n*** %s No longer running!", (runningTask->name).c_str());
 				// Start highest priority task
 				runningTask = tasks.at(0);
 				runningTask->setActive(true);
-				if(PRINT_ACTIVE)printf("\n--> %s Active task at time %d!", (runningTask->name).c_str(), elapsedTime());
+				if(PRINT_ACTIVE)printf("\n--> %s Active task at time %d!", (runningTask->name).c_str(), currentTime);
 			}
 
 		lastCheckedTime = currentTime;
